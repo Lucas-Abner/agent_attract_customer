@@ -1,0 +1,14 @@
+[project]
+name = "agent-attract-customer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12, <3.14"
+dependencies = [
+    "agno>=2.3.2",
+    "fastapi>=0.121.0",
+    "numpy>=2.3.4",
+    "ollama>=0.6.1",
+    "pandas>=2.3.3",
+    "pydantic>=2.12.4",
+]
