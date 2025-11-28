@@ -1,6 +1,8 @@
 from instagrapi.exceptions import LoginRequired
 from instagrapi import Client
 import os
+import time
+import random
 
 USERNAME = os.getenv("LOGIN_USERNAME", "llucasabner")
 PASSWORD = os.getenv("LOGIN_PASSWORD", "lucascaixeta1")
@@ -50,14 +52,47 @@ else:
 
 target_user = "llucasabnerr"
 
+# try:
+#     user_id_num = cl.user_id_from_username(target_user)
+#     print(f"ID user do @{target_user} é {user_id_num}")
+
+#     user_details = cl.user_info_by_username(target_user)
+#     print(f"\nDetails for @{target_user}:")
+#     print(f" Followers: {user_details.follower_count}")
+#     print(f" Bio: {user_details.biography[:50]}...")
+
+# except Exception as e:
+#     print(f"Erro ao obter o ID do usuário @{target_user}: {e}")
+
+target_hashtag_for_liking = "pythonprogramming"
+number_of_posts_to_like = 1
+
 try:
-    user_id_num = cl.user_id_from_username(target_user)
-    print(f"ID user do @{target_user} é {user_id_num}")
+    print(f"Curtindo posts com a hashtag #{target_hashtag_for_liking}...")
+    recent_hashtag_media = cl.hashtag_medias_recent(target_hashtag_for_liking, amount=number_of_posts_to_like * 2)
+    print(f"Encontrados {len(recent_hashtag_media)} posts recentes para a hashtag #{target_hashtag_for_liking}.")
 
-    user_details = cl.user_info_by_username(target_user)
-    print(f"\nDetails for @{target_user}:")
-    print(f" Followers: {user_details.follower_count}")
-    print(f" Bio: {user_details.biography[:50]}...")
+    liked_count = 0
+    if recent_hashtag_media:
+        for media in recent_hashtag_media:
+            if liked_count >= number_of_posts_to_like:
+                break
 
-except Exception as e:
-    print(f"Erro ao obter o ID do usuário @{target_user}: {e}")
+            if not media.has_liked:
+                print(f" Curtindo post PK {media.pk} de @{media.user.username}...")
+                try:
+                    media_id_str_to_like = cl.media_id(media.pk)
+                    cl.media_like(media_id_str_to_like)
+                    print(f"  Post curtido com sucesso!")
+
+                    time.sleep(random.uniform(15, 25))
+                except Exception as e_like:
+                    print(f" Erro ao curtir o post: {e_like}")
+
+            else:
+                print(f" Post PK {media.pk} já foi curtido anteriormente.")
+        print(f"\nFinalizado o processo de curtir posts com a hashtag #{target_hashtag_for_liking}.")
+    else:
+        print(f"Nenhum post recente encontrado para a hashtag #{target_hashtag_for_liking}.")
+except Exception as e_hashtag:
+    print(f"Erro ao buscar posts para a hashtag #{target_hashtag_for_liking}: {e_hashtag}")
