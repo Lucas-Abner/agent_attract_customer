@@ -125,7 +125,9 @@ try:
             time.sleep(random.uniform(1,3))
 
             user_ids_commented = cl.user_id_from_username(comments[0].user.username)
+
             print(f"ID do usuário que comentou primeiro: {user_ids_commented}")
+            
             time.sleep(random.uniform(3,6))
 
         except Exception as e:
