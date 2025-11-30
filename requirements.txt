@@ -6,3 +6,4 @@ fastapi
 ollama
 dotenv
 instagrapi
+openai
