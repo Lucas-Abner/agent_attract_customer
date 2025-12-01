@@ -41,7 +41,7 @@ monitoring_agent = Agent(
     description="Agente para buscar posts recentes com uma hashtag específica e recuperar os comentários desses posts e Usuários.",
     instructions=(
         "Você deve usar APENAS a ferramenta fetch_posts disponível."
-        "Pegue a lista de hashtags fornecida, escolha duas hashtags e busque posts relacionados. "
+        "Pegue a lista de hashtags fornecida, escolha 2 hashtags e busque posts relacionados. "
         "Hashtags disponíveis: " + ", ".join(hashtags) + "."
         "Não invente código. Não simule resultados. "
         "Passe os parâmetros corretos: target_hashtag_for_liking como string e amount como número inteiro. "

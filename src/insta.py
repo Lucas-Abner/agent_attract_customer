@@ -126,7 +126,7 @@ def autenticar_instagram():
 
 @tool(
         name="fetch_posts",
-        description="Busca posts recentes com uma hashtag específica e recupera os comentários desses posts e Usuários.",
+        description="Busca posts recentes com hashtags específicas e recupera os comentários desses posts e Usuários.",
 )
 def fetch_posts(target_hashtag_for_liking: str, amount: int):
     """
