@@ -61,7 +61,19 @@ def load_instagram_session(USERNAME: str, PASSWORD: str) -> str:
     else:
         return "Autenticação no login falhou. Verifique suas credenciais."
 
+def autenticar_instagram():
+    cl = Client()
+    SESSION_FILE_PATH = "session_instagram.json"
+    cl.load_settings(SESSION_FILE_PATH)
+    print(f"Loaded session from {SESSION_FILE_PATH}")
+    cl.login(USERNAME, PASSWORD)
+    cl.get_timeline_feed()
+    cl.dump_settings(SESSION_FILE_PATH)
+    return cl
+
 # target_user = "llucasabnerr"
+
+# cl = autenticar_instagram()
 
 # try:
 #     user_id_num = cl.user_id_from_username(target_user)
@@ -110,19 +122,10 @@ def load_instagram_session(USERNAME: str, PASSWORD: str) -> str:
 #     print(f"Erro ao buscar posts para a hashtag #{target_hashtag_for_liking}: {e_hashtag}")
 
 
-target_hashtag_for_liking = "pythonprogramming"
+# target_hashtag_for_liking = "pythonprogramming"
 
 # time.sleep(random.uniform(2,5))
 
-def autenticar_instagram():
-    cl = Client()
-    SESSION_FILE_PATH = "session_instagram.json"
-    cl.load_settings(SESSION_FILE_PATH)
-    print(f"Loaded session from {SESSION_FILE_PATH}")
-    cl.login(USERNAME, PASSWORD)
-    cl.get_timeline_feed()
-    cl.dump_settings(SESSION_FILE_PATH)
-    return cl
 
 @tool(
         name="fetch_posts",
@@ -264,8 +267,77 @@ def fetch_comments_for_post(media_id: str, amount: int):
 
 # message_to_direct = "Ola! Esta é uma mensagem automatizada."
 
-# try:
-#     cl.direct_send(message_to_direct, user_ids=[56295393358])
-#     print(f"Mensagem enviada para o usuário com ID 56295393358")
-# except Exception as e_direct:
-#     print(f"Erro ao enviar mensagem direta: {e_direct}")
+# @tool(
+#         name="receive_direct_message",
+#         description="Ferramenta para verificar mensagens diretas de um usuário específico.",
+# )
+def receive_direct_message(user_id: str = '', message: str=""):
+    """
+    Ferramenta para verificar mensagens diretas de um usuário específico.
+    Args:
+        user_id: ID do usuário para verificar mensagens diretas.
+    Returns:
+        interactions: Lista de interações (mensagens) com o usuário específico.
+
+    Se o usuário não tiver iniciado uma conversa, chame a função `send_direct_message`.
+    Os parâmetros necessários para essa função são o ID do usuário e a mensagem a ser enviada.
+    """
+
+    cl = autenticar_instagram()
+    try:
+        messages = cl.direct_threads()
+
+        interactions = []
+        for thread in messages:
+            # Filtra apenas as mensagens do user_id específico
+            usuario = [str(msg.user_id) for msg in thread.messages]
+            print("User IDs na thread:", usuario[-1])
+
+            if user_id in usuario:
+                print(f"Thread ID: {thread.id}")
+                print(usuario[-1])  # Imprime SEMPRE a última mensagem
+                if usuario[-1] != user_id:
+                    print(f"Última mensagem não é do usuário {user_id}")
+                    print(f"Mensagem: {thread.messages[0].text}")
+                    return f"Última mensagem não é do usuário {user_id}. Mensagem: {thread.messages[-1].text}. Por isso, não será possivel enviar uma nova mensagem."
+
+                else:
+                    for msg in range(len(thread.messages[-10:])):
+                        print(f"Mensagem: {thread.messages[msg].text}")
+                        interactions.append({
+                            "thread_id": thread.id,
+                            "user_id": thread.messages[msg].user_id,
+                            "message": thread.messages[msg].text
+                        })
+
+                    print(interactions)
+                return interactions                    
+            elif user_id not in usuario:
+                print("Conversa não iniciada com o usuário alvo.")
+                return send_direct_message(user_id, message)
+
+
+    except Exception as e:
+        print(f"Erro ao receber mensagens diretas: {e}")
+
+receive_direct_message("56295393358", "Olá! Esta é uma mensagem de teste enviada via agente.")
+
+@tool(
+        name="send_direct_message",
+        description="Ferramenta para enviar mensagens diretas para um usuário específico.",
+)
+def send_direct_message(id, message_to_direct: str):
+
+    """
+    Ferramenta para enviar mensagens diretas para um usuário específico.
+    Args:
+        id: ID do usuário para enviar a mensagem direta.
+        message_to_direct: Conteúdo da mensagem a ser enviada.
+    """
+
+    cl = autenticar_instagram()
+    try:
+        cl.direct_send(message_to_direct, user_ids=[id])
+        return f"Mensagem enviada para o usuário com ID {id}"
+    except Exception as e_direct:
+        print(f"Erro ao enviar mensagem direta: {e_direct}")
