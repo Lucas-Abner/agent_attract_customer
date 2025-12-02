@@ -17,6 +17,26 @@ hashtags_file = 'hashtag.txt'
 with open(hashtags_file, 'r') as file:
     hashtags = [line.strip() for line in file if line.strip() and not line.startswith('#')]
 
+
+def process_json(content: str):
+
+    post_context = content
+    print("Contexto do post:", post_context)
+
+    match_2 = re.search(r"```json(.*?)```", post_context, re.S)
+    print("Match encontrado:", match_2)
+
+    if not match_2:
+        raise ValueError("Nenhum bloco JSON encontrado na resposta do agente.")
+
+    json_text_2 = match_2.group(1).strip()
+    print("JSON extraído:", json_text_2)
+
+    json_data_2 = json.loads(json_text_2)
+    print("Dados JSON carregados:", json_data_2)
+
+    json_output = json.dump(json_data_2, open('positive_comments.json', "w"))
+
 USERNAME = os.environ.get("LOGIN_USERNAME")
 PASSWORD = os.environ.get("LOGIN_PASSWORD")
 
@@ -116,20 +136,8 @@ sentiment_agent = Agent(
 )
 
 resp_post : RunOutput = sentiment_agent.run(f"Use o ID do post nesse json {ids_recuperados} para buscar os comentários desse post.")
-post_context = resp_post.content
-print("Contexto do post:", post_context)
 
-match_2 = re.search(r"```json(.*?)```", post_context, re.S)
-print("Match encontrado:", match_2)
 
-if not match_2:
-    raise ValueError("Nenhum bloco JSON encontrado na resposta do agente.")
 
-json_text_2 = match_2.group(1).strip()
-print("JSON extraído:", json_text_2)
 
-json_data_2 = json.loads(json_text_2)
-print("Dados JSON carregados:", json_data_2)
-
-json_output = json.dump(json_data_2, open('positive_comments.json', "w"))
 
