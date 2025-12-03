@@ -320,7 +320,44 @@ def receive_direct_message(user_id: str = '', message: str=""):
     except Exception as e:
         print(f"Erro ao receber mensagens diretas: {e}")
 
-receive_direct_message("56295393358", "Olá! Esta é uma mensagem de teste enviada via agente.")
+
+@tool(
+        name="return_infos_thread",
+        description="Ferramenta para retornar informações das threads de mensagens diretas.",
+)
+def return_infos_thread(user_id = None): 
+
+    cl = autenticar_instagram()
+
+    try:
+        messages = cl.direct_threads()
+
+        interactions = []
+        for thread in messages:
+            user_ids_in_thread = [str(msg.user_id) for msg in thread.messages]
+            
+            if isinstance(user_id, str):
+                user_id = user_id
+            elif isinstance(user_id, list):
+                user_id = [str(uid) for uid in user_id]
+            else:
+                user_id = None  # Se user_id não for fornecido, defina como None
+            if user_id in user_ids_in_thread:
+                for msg in range(len(thread.messages[-10:])):
+                                    interactions.append({
+                                        "thread_id": thread.id,
+                                        "user_id": thread.messages[msg].user_id,
+                                        "message": thread.messages[msg].text
+                                    })
+
+        return interactions
+    except Exception as e:
+        print(f"Erro ao receber mensagens diretas: {e}")
+
+# res = return_infos_thread('56295393358')
+# print("Informações das threads de mensagens diretas:", res)
+
+# receive_direct_message("56295393358", "Olá! Esta é uma mensagem de teste enviada via agente.")
 
 @tool(
         name="send_direct_message",
