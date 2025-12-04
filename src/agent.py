@@ -33,65 +33,81 @@ Não mencione que você é um agente ou que está utilizando ferramentas automat
 '''
 
 
-def receive_direct_message(user_id: str = '56295393358'):
+# filepath: /home/lucas.abner/Documentos/code/agent_attract_customer/src/agent.py
+# ...existing code...
+def receive_direct_message(user_ids: list[str] | None = None):
     """
-    Ferramenta para verificar mensagens diretas de um usuário específico.
-    Args:
-        user_id: ID do usuário para verificar mensagens diretas.
-    Returns:
-        interactions: Lista de interações (mensagens) com o usuário específico.
-
-    Se o usuário não tiver iniciado uma conversa, chame a função `send_direct_message`.
-    Os parâmetros necessários para essa função são o ID do usuário e a mensagem a ser enviada.
+    Verifica threads para uma lista de user_ids.
+    - Se o user_id estiver na thread e a ÚLTIMA mensagem for do usuário, analisa sentimento e responde.
+    - Se o user_id não estiver na thread, inicia conversa via initial_agent.
+    Retorna dict com resultados por user_id.
     """
 
     cl = autenticar_instagram()
+    if user_ids is None:
+        user_ids = []
+
+    results = {}
     try:
         messages = cl.direct_threads()
         for thread in messages:
-            # Filtra apenas as mensagens do user_id específico
-            usuario = [str(msg.user_id) for msg in thread.messages]
-            print("User IDs na thread:", usuario[-1])
+            if not getattr(thread, "messages", None):
+                continue
 
-            if user_id in usuario:
-                print(f"Thread ID: {thread.id}")
+            # lista de user_ids na thread (strings)
+            usuario_ids = [str(msg.user_id) for msg in thread.messages if getattr(msg, "user_id", None) is not None]
+            if not usuario_ids:
+                continue
 
-                ultima_mensagem = None
-                for msg in reversed(thread.messages):
-                    if str(msg.user_id) == user_id:
-                        ultima_mensagem = msg
-                        break
+            # para cada user_id fornecido, checar presença nessa thread
+            for uid in user_ids:
+                uid = str(uid)
+                if uid not in usuario_ids:
+                    continue
 
-                ultima_mensagem_geral = thread.messages[0]
-                print(f"Última mensagem geral na thread: {ultima_mensagem_geral.text}")
-                if str(ultima_mensagem_geral.user_id) != user_id:
-                    print(f"Última mensagem é sua, aguardando resposta do usuário")
-                    print(f"Última mensagem do usuário: {ultima_mensagem.text if ultima_mensagem else 'N/A'}")
-                    return f"Aguardando resposta do usuário {user_id}. Última mensagem dele: {ultima_mensagem.text if ultima_mensagem else 'N/A'}"
+                # última mensagem geral (mais recente)
+                ultima_geral = thread.messages[-1]
+                # se última mensagem NÃO for do usuário alvo -> não enviar (aguardar)
+                if str(ultima_geral.user_id) != uid:
+                    results[uid] = {
+                        "thread_id": getattr(thread, "id", None),
+                        "action": "aguardar",
+                        "last_message_text": getattr(ultima_geral, "text", None)
+                    }
+                    continue
 
-                else:
-                    resp : RunOutput = send_agent.run(f"Envie uma mensagem direta para o usuário com user_id 56295393358'")
+                # última mensagem DO usuário alvo (mais recente mensagem do uid)
+                ultima_mensagem_usuario = next((m for m in reversed(thread.messages) if str(m.user_id) == uid), None)
+                texto = getattr(ultima_mensagem_usuario, "text", "") if ultima_mensagem_usuario else ""
 
-                    verify_resp = resp.content
-                    print("Resposta do usuário recebida:", verify_resp) 
+                # analisa sentimento usando analitic_agent (assume agente definido globalmente)
+                try:
+                    analisy: RunOutput = analitic_agent.run(f"Analise o sentimento da seguinte mensagem: {texto}")
+                    parsed = load_json_from_response(analisy.content)
+                except Exception as e:
+                    results[uid] = {"thread_id": getattr(thread, "id", None), "action": "erro_analise", "error": str(e)}
+                    continue
 
-                    analisy: RunOutput = analitic_agent.run(f"Analise o sentimento da seguinte mensagem enviada ao usuário {user_id}: {ultima_mensagem_geral.text}.")
-                    verify_analisy = analisy.content
-                    print("Análise de sentimento recebida:", verify_analisy)
-                    json_analisy = load_json_from_response(verify_analisy)
+                # compor e enviar resposta usando message_agent (assume ferramenta send_direct_message disponível)
+                try:
+                    msg_to_send = message_agent.run(f"Baseado na análise {parsed}, envie resposta apropriada para {uid}")
+                    results[uid] = {"thread_id": getattr(thread, "id", None), "action": "respondido", "response": msg_to_send.content}
+                except Exception as e:
+                    results[uid] = {"thread_id": getattr(thread, "id", None), "action": "erro_envio", "error": str(e)}
 
-                    msg_to_send = message_agent.run(f"Com base na análise de sentimento: {json_analisy}, envie uma resposta apropriada ao usuário {user_id}. Mantenha o contexto da conversa e evite repetições desnecessárias.")
-                    return msg_to_send.content
+        # para user_ids que não apareceram em nenhuma thread, iniciar conversa
+        for uid in user_ids:
+            if uid not in results:
+                try:
+                    response_message: RunOutput = initial_agent.run(f"Inicie conversa com {uid} enviando: 'Olá! Notei seu interesse...'")
+                    results[uid] = {"thread_id": None, "action": "iniciado", "response": response_message.content}
+                except Exception as e:
+                    results[uid] = {"thread_id": None, "action": "erro_iniciar", "error": str(e)}
 
-
-            elif user_id not in usuario:
-                print("Conversa não iniciada com o usuário alvo.")
-                response_message : RunOutput = initial_agent.run(f"Inicie uma conversa com o usuário com user_id 56295393358 enviando a mensagem 'Olá! Notei seu interesse em nossos produtos. Gostaria de saber mais?'.")
-                return response_message.content
-
-
+        return results
     except Exception as e:
         print(f"Erro ao receber mensagens diretas: {e}")
+        return {"error": str(e)}
 
 
 hashtags_file = 'hashtag.txt'
@@ -215,92 +231,90 @@ list_id = []
 for i, item in enumerate(context_json):
     list_id.append(item['user_id'])
 
-resultt = receive_direct_message(user_id=list_id)
+
+send_agent = Agent(
+    model=Ollama("qwen2.5:7b"),
+    tools=[return_infos_thread],
+    instructions=(
+        f"O resultado do agente anterior é: {context_json}."
+        "Pegue somente os user_id dos usuários que fizeram comentários positivos e retorne as mensagens deles."
+        "Transforme em uma lista de user_id como string"
+        "Use return_infos_thread para ver todas as mensagens."
+        ),
+    expected_output=("Um json no seguinte formato: \n"
+                    "```json\n"
+                        "[\n"
+                        "  {\n"
+                        "    \"thread_id\": \"123456789\",\n"
+                        "    \"user_id\": \"usuario_exemplo\",\n"
+                        "    \"message\": \"Adorei o design! Muito inspirador.\",\n"
+                        "  }\n"
+                        "]\n"
+                        "```"
+    ),
+)
+
+
+initial_agent = Agent(
+    model=OpenAIChat(
+        api_key=os.environ.get("GROQ_API_KEY"),
+        base_url="https://api.groq.com/openai/v1",
+        id="openai/gpt-oss-20b"
+    ),
+    name="message_instagram_user",
+    description="Agente para iniciar uma conversa com um usuário no Instagram.",
+    markdown=True,
+    tools=[send_direct_message],
+    tool_call_limit=1,
+    instructions=("Use a ferramenta send_direct_message para iniciar uma conversa com o usuário que ainda não iniciou uma conversa."
+                  f"O user_id esta nesse json: {context_json}."
+                  "Envie uma mensagem amigável para iniciar a conversa e tentar obter o contato do usuário."
+                  "Mantenha o contexto de que você é um agente que interage com clientes em potencial no Instagram."
+                  "Se o usuário responder, analise o sentimento da resposta e aja de acordo."),
+    expected_output="Envie uma mensagem inicial para o usuário e aguarde a resposta.",
+)
+
+
+analitic_agent = Agent(
+    model=OpenAIChat(
+        api_key=os.environ.get("GROQ_API_KEY"),
+        base_url="https://api.groq.com/openai/v1",
+        id="openai/gpt-oss-20b"
+    ),
+    name="json_sentiment_data",
+    description="Agente para analisar o sentimento das mensagens enviadas no Instagram.",
+    markdown=True,
+    tool_call_limit=1,
+    instructions=("Pegue o resultado obtido pelo agente anterior e verifique o sentimento das mensagens enviadas."
+                  "O resultado será passado para você."),
+    expected_output=("Analise o sentimento e envie uma nova mensagem e retorne em json com os campos:"
+                     "```json\n"
+                        "[\n"
+                        "  {\n"
+                        "    \"user_id\": \"usuario_exemplo\",\n"
+                        "    \"analise_sentimento\": \"Negativo, Positivo, Neutro\",\n"
+                        "    \"ultima_mensagem\": \"Ultima mensagem enviada pelo usuario e analisada\",\n"
+                        "  }\n"
+                        "]\n"
+                        "```"),
+)
+
+message_agent = Agent(
+    model=OpenAIChat(
+        api_key=os.environ.get("GROQ_API_KEY"),
+        base_url="https://api.groq.com/openai/v1",
+        id="openai/gpt-oss-20b"
+    ),
+    system_message=SYSTEM_PROMPT,
+    description="Agente para enviar mensagens diretas no Instagram.",
+    tools=[send_direct_message],
+    instructions=('Pegue o json do agente anterior e envie uma mensagem direta ao usuário.'
+                'Use a ferramenta send_direct_message para enviar uma mensagem direta.'
+                'Passe os parâmetros corretos: user_id como string e message como string.'
+                f'O user_id esta contido nesse json: {context_json} .'
+                'Receba o histórico de mensagens e envie uma resposta apropriada com base no contexto da conversa.'
+                  )
+)
+
+resultt = receive_direct_message(user_ids=list_id)
 print("Resultado final do agente de recebimento de mensagens diretas:", resultt)
-
-# send_agent = Agent(
-#     model=Ollama("qwen2.5:7b"),
-#     tools=[return_infos_thread],
-#     instructions=(
-#         f"O resultado do agente anterior é: {context_json}."
-#         "Pegue somente os user_id dos usuários que fizeram comentários positivos e retorne as mensagens deles."
-#         "Transforme em uma lista de user_id como string"
-#         "Use return_infos_thread para ver todas as mensagens."
-#         ),
-#     expected_output=("Um json no seguinte formato: \n"
-#                     "```json\n"
-#                         "[\n"
-#                         "  {\n"
-#                         "    \"thread_id\": \"123456789\",\n"
-#                         "    \"user_id\": \"usuario_exemplo\",\n"
-#                         "    \"message\": \"Adorei o design! Muito inspirador.\",\n"
-#                         "  }\n"
-#                         "]\n"
-#                         "```"
-#     ),
-# )
-
-# analitic_agent = Agent(
-#     model=OpenAIChat(
-#         api_key=os.environ.get("GROQ_API_KEY"),
-#         base_url="https://api.groq.com/openai/v1",
-#         id="openai/gpt-oss-20b"
-#     ),
-#     name="json_sentiment_data",
-#     description="Agente para analisar o sentimento das mensagens enviadas no Instagram.",
-#     markdown=True,
-#     tool_call_limit=1,
-#     instructions=("Pegue o resultado obtido pelo agente anterior e verifique o sentimento das mensagens enviadas."
-#                   "O resultado será passado para você."),
-#     expected_output=("Analise o sentimento e envie uma nova mensagem e retorne em json com os campos:"
-#                      "```json\n"
-#                         "[\n"
-#                         "  {\n"
-#                         "    \"user_id\": \"usuario_exemplo\",\n"
-#                         "    \"analise_sentimento\": \"Negativo, Positivo, Neutro\",\n"
-#                         "    \"ultima_mensagem\": \"Ultima mensagem enviada pelo usuario e analisada\",\n"
-#                         "  }\n"
-#                         "]\n"
-#                         "```"),
-# )
-
-# initial_agent = Agent(
-#     model=OpenAIChat(
-#         api_key=os.environ.get("GROQ_API_KEY"),
-#         base_url="https://api.groq.com/openai/v1",
-#         id="openai/gpt-oss-20b"
-#     ),
-#     name="message_instagram_user",
-#     description="Agente para iniciar uma conversa com um usuário no Instagram.",
-#     markdown=True,
-#     tools=[send_direct_message],
-#     tool_call_limit=1,
-#     instructions=("Use a ferramenta send_direct_message para iniciar uma conversa com o usuário que ainda não iniciou uma conversa."
-#                   "O user_id é '56295393358'."
-#                   "Envie uma mensagem amigável para iniciar a conversa e tentar obter o contato do usuário."
-#                   "Mantenha o contexto de que você é um agente que interage com clientes em potencial no Instagram."
-#                   "Se o usuário responder, analise o sentimento da resposta e aja de acordo."),
-#     expected_output="Envie uma mensagem inicial para o usuário e aguarde a resposta.",
-# )
-
-# message_agent = Agent(
-#     model=OpenAIChat(
-#         api_key=os.environ.get("GROQ_API_KEY"),
-#         base_url="https://api.groq.com/openai/v1",
-#         id="openai/gpt-oss-20b"
-#     ),
-#     system_message=SYSTEM_PROMPT,
-#     description="Agente para enviar mensagens diretas no Instagram.",
-#     tools=[send_direct_message],
-#     instructions=('Pegue o json do agente anterior e envie uma mensagem direta ao usuário.'
-#                 'Use a ferramenta send_direct_message para enviar uma mensagem direta.'
-#                 'Passe os parâmetros corretos: user_id como string e message como string.'
-#                 'O user_id é "56295393358".'
-#                 'Receba o histórico de mensagens e envie uma resposta apropriada com base no contexto da conversa.'
-#                   )
-# )
-
-
-# resp = receive_direct_message()
-
-# print("Resposta final do agente:", resp)
