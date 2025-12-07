@@ -1,8 +1,8 @@
-from tools import (load_instagram_session,
+from .tools import (load_instagram_session,
                    send_direct_message, 
                    return_infos_thread, 
                    fetch_posts)
-from utils import load_json_from_response, autenticar_instagram, fetch_comments_for_post, json_save_data
+from .utils import load_json_from_response, autenticar_instagram, fetch_comments_for_post, json_save_data
 from agno.agent import Agent, RunOutput
 from agno.models.ollama import Ollama
 from agno.models.openai import OpenAIChat

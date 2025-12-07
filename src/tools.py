@@ -1,6 +1,6 @@
 from instagrapi.exceptions import LoginRequired
 from instagrapi import Client
-from utils import autenticar_instagram
+from .utils import autenticar_instagram
 import os
 import time
 import random

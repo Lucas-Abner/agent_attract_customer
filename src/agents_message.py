@@ -1,6 +1,6 @@
 from agno.agent import Agent, RunOutput
 from agno.models.openai import OpenAIChat
-from tools import send_direct_message
+from .tools import send_direct_message
 from dotenv import load_dotenv
 import os
 
@@ -34,7 +34,7 @@ analitic_agent = Agent(
                     "```json\n"
                         "[\n"
                         "  {\n"
-                        "    \"user_id\": \"usuario_exemplo\",\n"
+                        "    \"user_id\": \"12345678\",\n"
                         "    \"analise_sentimento\": \"Negativo, Positivo, Neutro\",\n"
                         "    \"ultima_mensagem\": \"Ultima mensagem enviada pelo usuario e analisada\",\n"
                         "  }\n"
@@ -57,5 +57,7 @@ message_agent = Agent(
                 'Passe os parâmetros corretos: user_id como string e message como string.'
                 'O user_id é a lista de IDs de usuários.'
                 'Receba o histórico de mensagens e envie uma resposta apropriada com base no contexto da conversa.'
-                )
+    ),
+    expected_output="Envie uma mensagem direta personalizada para o usuário com base na análise de sentimento.",
+    tool_call_limit=1
 )
