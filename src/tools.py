@@ -62,12 +62,13 @@ def load_instagram_session(USERNAME: str, PASSWORD: str) -> str:
     else:
         return "Autenticação no login falhou. Verifique suas credenciais."
 
-@tool(
-        name="fetch_posts",
-        description="Busca posts recentes com hashtags específicas e recupera os comentários desses posts e Usuários.",
-)
-def fetch_posts(target_hashtag_for_liking: str | list[str], amount: int):
+# @tool(
+#         name="fetch_posts",
+#         description="Busca posts recentes com hashtags específicas e recupera os comentários desses posts e Usuários.",
+# )
+def fetch_posts(target_hashtag_for_liking: list[str] | str, amount: int):
     """
+    Loga no instagram.
     Busca posts recentes com uma hashtag específica e recupera os comentários.
     
     Args:
@@ -79,16 +80,27 @@ def fetch_posts(target_hashtag_for_liking: str | list[str], amount: int):
     """
 
     if isinstance(target_hashtag_for_liking, str):
-        hashtags = [target_hashtag_for_liking]
+        import ast
+        try:
+            parsed = ast.literal_eval(target_hashtag_for_liking)
+            if isinstance(parsed, (list, tuple)):
+                print("Entrou no primeiro if")
+                hashtags = [str(h).strip() for h in parsed]
+            else:
+                print("Entrou no else do primeiro if")
+                hashtags = [target_hashtag_for_liking]
+        except (ValueError, SyntaxError):
+            hashtags = list(target_hashtag_for_liking)
     else:
+        print("Entrou no else geral")
         hashtags = target_hashtag_for_liking
 
     cl = autenticar_instagram()
     results = []
 
     for hashtag in hashtags:
-
-        hashtag_search = hashtag.replace("#", "")
+        print(f"Processando hashtag individual: {hashtag}")
+        hashtag_search = hashtag.lstrip('#')  # Remove '#' se estiver presente
         try:
             print(f"Posts com a hashtag #{hashtag_search}")
             recent_hash_media = cl.hashtag_medias_recent(hashtag_search, amount=amount)
@@ -100,8 +112,6 @@ def fetch_posts(target_hashtag_for_liking: str | list[str], amount: int):
                     media_id = cl.media_id(media.pk)
                     print(f"ID do post: {media_id}")
                     # Aqui é onde a validação pode falhar (media_info usa modelos pydantic)
-                    media_info = cl.media_info(media_id)
-                    # print(f"Info do post: {media_info}")
                     results.append({
                         "pk": media.pk,
                         "id": media_id,
@@ -121,40 +131,14 @@ def fetch_posts(target_hashtag_for_liking: str | list[str], amount: int):
                     # captura outros erros (rede, parsing, etc.) mas não interrompe tudo
                     print(f"[Erro] ao processar media.pk={getattr(media, 'pk', 'unknown')}: {e}")
                     continue
-
-            return results
-
-
+            time.sleep(random.uniform(2,5))
 
         except Exception as e_hashtag:
             print(f"Erro ao buscar posts para a hashtag #{target_hashtag_for_liking}: {e_hashtag}")
-            print("Vamos tentar autenticar novamente...")
-            for media in recent_hash_media:
-                try:
-                    media_id = cl.media_id(media.pk)
-                    print(f"ID do post: {media_id}")
-
-                    # Aqui é onde a validação pode falhar (media_info usa modelos pydantic)
-                    media_info = cl.media_info(media_id)
-                    # print(f"Info do post: {media_info}")
-                    results.append({
-                        "pk": media.pk,
-                        "id": media_id
-                    })
-                except ValidationError as ve:
-                    # pydantic ValidationError -> pular e logar
-                    print(f"[ValidationError] Pulando media.pk={getattr(media, 'pk', 'unknown')}: {ve}")
-                    # # opcional: salvar/inspecionar o raw response para debugar
-                    # try:
-                    #     raw = getattr(media, "json", None) or getattr(media, "raw", None)
-                    #     print("Raw media (parte):", str(raw)[:1000])
-                    # except Exception:
-                    #     pass
-                    # continue
-                except Exception as e:
-                    # captura outros erros (rede, parsing, etc.) mas não interrompe tudo
-                    print(f"[Erro] ao processar media.pk={getattr(media, 'pk', 'unknown')}: {e}")
-                    continue
+            print("[INFO] Pulando para a próxima hashtag...")
+            continue
+            
+    return results
 
 @tool(
         name="return_infos_thread",

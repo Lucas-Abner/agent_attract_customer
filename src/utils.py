@@ -3,7 +3,6 @@ import json
 import re
 from dotenv import load_dotenv
 import os
-import datetime
 
 load_dotenv()
 
@@ -11,28 +10,66 @@ USERNAME = os.environ.get("LOGIN_USERNAME")
 PASSWORD = os.environ.get("LOGIN_PASSWORD")
 
 def autenticar_instagram():
-    cl = Client()
+    """
+    Retorna cliente Instagram já autenticado usando sessão salva.
+    """
     SESSION_FILE_PATH = "session_instagram.json"
-    cl.load_settings(SESSION_FILE_PATH)
-    print(f"Loaded session from {SESSION_FILE_PATH}")
-    cl.login(USERNAME, PASSWORD)
-    cl.get_timeline_feed()
-    cl.dump_settings(SESSION_FILE_PATH)
-    return cl
-
-def load_json_from_response(content : str):
-    match = re.search(r"```json(.*?)```", content, re.S)
-    print("Match encontrado:", match)
-
-    if not match:
-        raise ValueError("Nenhum bloco JSON encontrado na resposta do agente.")
-
-    json_text = match.group(1).strip()
-    print("JSON extraído:", json_text)
-
-    json_data = json.loads(json_text)
-    print("Dados JSON carregados:", json_data)
-    return json_data
+    cl = Client()
+    
+    if os.path.exists(SESSION_FILE_PATH):
+        try:
+            cl.load_settings(SESSION_FILE_PATH)
+            # IMPORTANTE: NÃO chamar login() se já tem sessão válida
+            # cl.login(USERNAME, PASSWORD)  # ← REMOVA ISSO
+            cl.get_timeline_feed()  # Valida se sessão está ativa
+            return cl
+        except Exception as e:
+            print(f"Erro ao validar sessão: {e}")
+            print("Sessão expirada, fazendo novo login...")
+            # Remove sessão antiga
+            os.remove(SESSION_FILE_PATH)
+    
+    # Se não tem sessão ou expirou, faz novo login
+    try:
+        cl.login(os.getenv("LOGIN_USERNAME"), os.getenv("LOGIN_PASSWORD"))
+        cl.dump_settings(SESSION_FILE_PATH)
+        print("Nova sessão criada e salva")
+        return cl
+    except Exception as e:
+        raise Exception(f"Falha ao autenticar: {e}")
+    
+def load_json_from_response(response_text: str):
+    """
+    Extrai JSON de uma resposta que pode conter markdown ou texto adicional.
+    """
+    try:
+        # Tenta carregar diretamente como JSON
+        return json.loads(response_text)
+    except json.JSONDecodeError:
+        pass
+    
+    # Tenta extrair JSON de blocos de código markdown
+    json_pattern = r'```(?:json)?\s*(\[[\s\S]*?\]|\{[\s\S]*?\})\s*```'
+    matches = re.findall(json_pattern, response_text, re.DOTALL)
+    
+    if matches:
+        try:
+            return json.loads(matches[0])
+        except json.JSONDecodeError:
+            pass
+    
+    # Tenta encontrar array ou objeto JSON diretamente no texto
+    json_pattern_direct = r'(\[[\s\S]*?\]|\{[\s\S]*?\})'
+    matches_direct = re.findall(json_pattern_direct, response_text, re.DOTALL)
+    
+    for match in matches_direct:
+        try:
+            return json.loads(match)
+        except json.JSONDecodeError:
+            continue
+    
+    # Se nada funcionar, lança erro com contexto
+    raise ValueError(f"Não foi possível extrair JSON válido da resposta. Resposta recebida:\n{response_text[:500]}...")
 
 def json_save_data(data, filename="infos_comments.json"):
 

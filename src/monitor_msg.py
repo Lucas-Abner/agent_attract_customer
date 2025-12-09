@@ -3,6 +3,7 @@ import threading
 import time
 import json
 import datetime
+import os
 from agno.agent import RunOutput
 from .utils import autenticar_instagram, load_json_from_response, delete_json_key
 from .agents_message import analitic_agent, message_agent
@@ -12,12 +13,45 @@ class InstagramMonitor:
         self.running = False
         self.thread = None
         self.results = {}
+        self.json_file = "infos_comments.json"
         self.user_ids_list = self._load_user_ids()
 
     def _load_user_ids(self):
-        with open("infos_comments.json", "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return [item['user_id'] for item in data]
+        """Carrega user_ids do arquivo JSON com validação robusta."""
+        if os.path.exists(self.json_file):
+            try:
+                with open(self.json_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    
+                    # Validar que é uma lista
+                    if not isinstance(data, list):
+                        print(f"[AVISO] {self.json_file} não contém uma lista. Resetando...")
+                        return []
+                    
+                    # Filtrar apenas dicionários com user_id
+                    user_ids = []
+                    for item in data:
+                        if isinstance(item, dict) and 'user_id' in item:
+                            user_ids.append(str(item['user_id']))
+                        elif isinstance(item, str):
+                            print(f"[AVISO] Item inválido encontrado (string): '{item}'. Ignorando...")
+                        else:
+                            print(f"[AVISO] Item inválido encontrado: {type(item)}. Ignorando...")
+                    
+                    print(f"[INFO] Carregados {len(user_ids)} user_ids válidos de {self.json_file}")
+                    return user_ids
+                    
+            except json.JSONDecodeError as e:
+                print(f"[ERRO] Falha ao ler {self.json_file}: {e}")
+                return []
+            except Exception as e:
+                print(f"[ERRO] Erro inesperado ao carregar user_ids: {e}")
+                return []
+        else:
+            print(f"[INFO] Arquivo {self.json_file} não existe. Criando vazio...")
+            with open(self.json_file, 'w', encoding='utf-8') as f:
+                json.dump([], f)
+
 
     def start(self, user_ids=None):
         if self.running:
