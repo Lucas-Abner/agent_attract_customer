@@ -1,8 +1,12 @@
 from instagrapi import Client
+from pydantic import ValidationError
 import json
 import re
 from dotenv import load_dotenv
 import os
+import time
+import random
+
 
 load_dotenv()
 
@@ -43,7 +47,6 @@ def load_json_from_response(response_text: str):
     Extrai JSON de uma resposta que pode conter markdown ou texto adicional.
     """
     try:
-        # Tenta carregar diretamente como JSON
         return json.loads(response_text)
     except json.JSONDecodeError:
         pass
@@ -55,20 +58,21 @@ def load_json_from_response(response_text: str):
     if matches:
         try:
             return json.loads(matches[0])
-        except json.JSONDecodeError:
-            pass
+        except json.JSONDecodeError as e:
+            print(f"[ERRO] JSON em markdown inválido: {e}")
+            print(f"Conteúdo: {matches[0][:200]}...")
     
     # Tenta encontrar array ou objeto JSON diretamente no texto
     json_pattern_direct = r'(\[[\s\S]*?\]|\{[\s\S]*?\})'
     matches_direct = re.findall(json_pattern_direct, response_text, re.DOTALL)
     
-    for match in matches_direct:
+    if matches_direct:
         try:
-            return json.loads(match)
-        except json.JSONDecodeError:
-            continue
+            return json.loads(matches_direct[0])
+        except json.JSONDecodeError as e:
+            print(f"[ERRO] JSON direto inválido: {e}")
+            print(f"Conteúdo: {matches_direct[0][:200]}...")
     
-    # Se nada funcionar, lança erro com contexto
     raise ValueError(f"Não foi possível extrair JSON válido da resposta. Resposta recebida:\n{response_text[:500]}...")
 
 def json_save_data(data, filename="infos_comments.json"):
@@ -83,6 +87,91 @@ def json_save_data(data, filename="infos_comments.json"):
 
     with open(filename, "w", encoding="utf-8") as file:
         json.dump(existing_data, file, ensure_ascii=False, indent=4)
+
+# def fetch_posts(target_hashtag_for_liking: list[str] | str, amount: int):
+#     """
+#     Loga no instagram.
+#     Busca posts recentes com uma hashtag específica e recupera os comentários.
+    
+#     Args:
+#         target_hashtag_for_liking: Nome da hashtag sem o símbolo # (exemplo: ['pythonprogramming', 'coding'])
+#         amount: Quantidade de posts para buscar (exemplo: 3)
+    
+#     Returns:
+#         dict: Dicionário com total_posts e lista de posts com comentários
+#     """
+
+#     import ast
+#     if isinstance(target_hashtag_for_liking, str):
+#         try:
+#             parsed = ast.literal_eval(target_hashtag_for_liking)
+#             if isinstance(parsed, (list, tuple)):
+#                 hashtags = [str(h).strip() for h in parsed]
+#             else:
+#                 hashtags = [target_hashtag_for_liking]
+#         except (ValueError, SyntaxError):
+#             hashtags = [target_hashtag_for_liking] if target_hashtag_for_liking else []  # ✅ FIX
+#     else:
+#         hashtags = target_hashtag_for_liking if target_hashtag_for_liking else []
+
+#     # ✅ Adicione validação extra para remover strings vazias
+#     hashtags = [h.strip() for h in hashtags if h and h.strip()]
+
+#     if not hashtags:
+#         if os.path.exists("hashtag.txt"):
+#             with open("hashtag.txt", "r", encoding="utf-8") as f:
+#                 hashtags_input = [line.strip() for line in f if line.strip()]
+#                 print(f"Hashtags carregadas de hashtag.txt: {hashtags_input}")
+#             hashtags = random.sample(hashtags_input, min(len(hashtags_input), 3))
+#         else:
+#             raise ValueError("Nenhuma hashtag fornecida e arquivo hashtag.txt não encontrado.")
+
+#     print(f"Hashtags selecionadas: {hashtags}")
+
+#     cl = autenticar_instagram()
+#     results = []
+
+#     for hashtag in hashtags:
+#         print(f"Processando hashtag individual: {hashtag}")
+#         hashtag_search = hashtag.lstrip('#')  # Remove '#' se estiver presente
+#         try:
+#             print(f"Posts com a hashtag #{hashtag_search}")
+#             recent_hash_media = cl.hashtag_medias_recent(hashtag_search, amount=amount)
+#             print(f"Posts encontrados: {len(recent_hash_media)}")
+#             time.sleep(random.uniform(1,3))
+
+#             for media in recent_hash_media:
+#                 try:
+#                     media_id = cl.media_id(media.pk)
+#                     print(f"ID do post: {media_id}")
+#                     # Aqui é onde a validação pode falhar (media_info usa modelos pydantic)
+#                     results.append({
+#                         "pk": media.pk,
+#                         "id": media_id,
+#                         "hashtag": hashtag_search
+#                     })
+#                 except ValidationError as ve:
+#                     # pydantic ValidationError -> pular e logar
+#                     print(f"[ValidationError] Pulando media.pk={getattr(media, 'pk', 'unknown')}: {ve}")
+#                     # # opcional: salvar/inspecionar o raw response para debugar
+#                     # try:
+#                     #     raw = getattr(media, "json", None) or getattr(media, "raw", None)
+#                     #     print("Raw media (parte):", str(raw)[:1000])
+#                     # except Exception:
+#                     #     pass
+#                     # continue
+#                 except Exception as e:
+#                     # captura outros erros (rede, parsing, etc.) mas não interrompe tudo
+#                     print(f"[Erro] ao processar media.pk={getattr(media, 'pk', 'unknown')}: {e}")
+#                     continue
+#             time.sleep(random.uniform(2,5))
+
+#         except Exception as e_hashtag:
+#             print(f"Erro ao buscar posts para a hashtag #{target_hashtag_for_liking}: {e_hashtag}")
+#             print("[INFO] Pulando para a próxima hashtag...")
+#             continue
+            
+#     return results
 
 
 def fetch_comments_for_post(media_id: str, amount: int):

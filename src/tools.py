@@ -62,10 +62,11 @@ def load_instagram_session(USERNAME: str, PASSWORD: str) -> str:
     else:
         return "Autenticação no login falhou. Verifique suas credenciais."
 
-# @tool(
-#         name="fetch_posts",
-#         description="Busca posts recentes com hashtags específicas e recupera os comentários desses posts e Usuários.",
-# )
+
+@tool(        
+    name="fetch_posts",
+    description="Busca posts recentes com uma hashtag específica e recupera os comentários.",
+)
 def fetch_posts(target_hashtag_for_liking: list[str] | str, amount: int):
     """
     Loga no instagram.
@@ -79,21 +80,32 @@ def fetch_posts(target_hashtag_for_liking: list[str] | str, amount: int):
         dict: Dicionário com total_posts e lista de posts com comentários
     """
 
+    import ast
     if isinstance(target_hashtag_for_liking, str):
-        import ast
         try:
             parsed = ast.literal_eval(target_hashtag_for_liking)
             if isinstance(parsed, (list, tuple)):
-                print("Entrou no primeiro if")
                 hashtags = [str(h).strip() for h in parsed]
             else:
-                print("Entrou no else do primeiro if")
                 hashtags = [target_hashtag_for_liking]
         except (ValueError, SyntaxError):
-            hashtags = list(target_hashtag_for_liking)
+            hashtags = [target_hashtag_for_liking] if target_hashtag_for_liking else []  # ✅ FIX
     else:
-        print("Entrou no else geral")
-        hashtags = target_hashtag_for_liking
+        hashtags = target_hashtag_for_liking if target_hashtag_for_liking else []
+
+    # ✅ Adicione validação extra para remover strings vazias
+    hashtags = [h.strip() for h in hashtags if h and h.strip()]
+
+    if not hashtags:
+        if os.path.exists("hashtag.txt"):
+            with open("hashtag.txt", "r", encoding="utf-8") as f:
+                hashtags_input = [line.strip() for line in f if line.strip()]
+                print(f"Hashtags carregadas de hashtag.txt: {hashtags_input}")
+            hashtags = random.sample(hashtags_input, min(len(hashtags_input), 3))
+        else:
+            raise ValueError("Nenhuma hashtag fornecida e arquivo hashtag.txt não encontrado.")
+
+    print(f"Hashtags selecionadas: {hashtags}")
 
     cl = autenticar_instagram()
     results = []

@@ -1,6 +1,6 @@
 from .tools import (load_instagram_session,
                    send_direct_message, 
-                   return_infos_thread, 
+                   return_infos_thread,
                    fetch_posts)
 from .utils import load_json_from_response, autenticar_instagram, fetch_comments_for_post, json_save_data
 from agno.agent import Agent, RunOutput
@@ -21,10 +21,10 @@ PASSWORD = os.environ.get("LOGIN_PASSWORD")
 EMPRESA_NOME = "InteriArt"
 AREA_ATUACAO = "design de interiores especializado em projetos personalizados, modelagem 3D, consultoria e soluções para ambientes residenciais e comerciais."
 
-# hashtags_file = 'hashtag.txt'
-# with open(hashtags_file, 'r') as file:
-#     hashtags = [line.strip() for line in file if line.strip() and not line.startswith('#')]
-# hashtags = random.sample(hashtags, min(len(hashtags), 5))  # Seleciona até 4 hashtags aleatórias
+hashtags_file = 'hashtag.txt'
+with open(hashtags_file, 'r') as file:
+    hashtags = [line.strip() for line in file if line.strip() and not line.startswith('#')]
+hashtags = random.sample(hashtags, min(len(hashtags), 5))  # Seleciona até 4 hashtags aleatórias
 
 # filepath: /home/lucas.abner/Documentos/code/agent_attract_customer/src/agent.py
 # ...existing code...
@@ -64,36 +64,36 @@ loaded_agent = Agent(
     expected_output="Login realizado com sucesso ou mensagem de erro.",
 )
 
-# monitoring_agent = Agent(
-#     model=OpenAIChat(
-#          api_key=os.environ.get("GROQ_API_KEY"),
-#          base_url="https://api.groq.com/openai/v1",
-#          id="openai/gpt-oss-20b"
-#     ),
-#     # model=Ollama("llama3.1:8b"),
-#     markdown=True,
-#     tools=[fetch_posts],
-#     description="Agente para buscar posts recentes com uma hashtag específica e recuperar os comentários desses posts e Usuários.",
-#     instructions=(
-#         "Use APENAS a ferramenta fetch_posts."
-#         "NÃO invente código Python. NÃO simule resultados."
-#         f"Hashtags disponíveis: {', '.join(hashtags)}."
-#         "Passe a lista completa de hashtags: fetch_posts(target_hashtag_for_liking={hashtags}, amount=6)"
-#         "Retorne EXATAMENTE o JSON que a ferramenta retornar, no formato:"
-#         "```json\n[{\"id\": \"...\", \"pk\": \"...\", \"hashtag\": \"...\"}]\n```"
-#         "NÃO adicione texto explicativo. APENAS o JSON da ferramenta."
-#     ),
-#     expected_output=("Lista de posts com comentários em formato JSON:"
-#                      "```json\n"
-#                         "[\n"
-#                         "  {\n"
-#                         "    \"id\": \"123456789\",\n"
-#                         "    \"pk\": \"PK do post.\",\n"
-#                         "  }\n"
-#                         "]\n"
-#                         "```"),
-#     tool_call_limit=2
-# )
+monitoring_agent = Agent(
+    model=OpenAIChat(
+         api_key=os.environ.get("GROQ_API_KEY"),
+         base_url="https://api.groq.com/openai/v1",
+         id="openai/gpt-oss-20b"
+    ),
+    # model=Ollama("llama3.1:8b"),
+    markdown=True,
+    tools=[fetch_posts],
+    description="Agente para buscar posts recentes com uma hashtag específica e recuperar os comentários desses posts e Usuários.",
+    instructions=(
+        "Use APENAS a ferramenta fetch_posts."
+        "NÃO invente código Python. NÃO simule resultados."
+        f"Hashtags disponíveis: {', '.join(hashtags)}."
+        "Passe a lista completa de hashtags: fetch_posts(target_hashtag_for_liking={hashtags}, amount=6)"
+        "Retorne EXATAMENTE o JSON que a ferramenta retornar, no formato:"
+        "```json\n[{\"id\": \"...\", \"pk\": \"...\", \"hashtag\": \"...\"}]\n```"
+        "NÃO adicione texto explicativo. APENAS o JSON da ferramenta."
+    ),
+    expected_output=("Lista de posts com comentários em formato JSON:"
+                     "```json\n"
+                        "[\n"
+                        "  {\n"
+                        "    \"id\": \"123456789\",\n"
+                        "    \"pk\": \"PK do post.\",\n"
+                        "  }\n"
+                        "]\n"
+                        "```"),
+    tool_call_limit=2
+)
 
 def get_comments(ids_recuperados):
 
@@ -231,10 +231,10 @@ def run_instagram_pipeline(hashtags_input: list[str] | str = None):
         hashtags_file = 'hashtag.txt'
         with open(hashtags_file, 'r') as file:
             hashtags = [line.strip() for line in file if line.strip() and not line.startswith('#')]
-        hashtags = random.sample(hashtags, min(len(hashtags), 5))  # Seleciona até 3 hashtags aleatórias
+        hashtags = random.sample(hashtags, min(len(hashtags), 3))  # Seleciona até 3 hashtags aleatórias
     else:
         if isinstance(hashtags_input, str):
-            hashtags = [hashtags_input.strip()]
+            hashtags = hashtags_input.strip()
         elif isinstance(hashtags_input, (list, tuple)):
             hashtags = [str(h).strip() for h in hashtags_input]
         else:
@@ -245,8 +245,11 @@ def run_instagram_pipeline(hashtags_input: list[str] | str = None):
     login_response = loaded_agent.print_response(f"Use a ferramenta load_instagram_session para fazer login no Instagram com o nome de usuário {USERNAME} e a senha {PASSWORD}, e retorne o resultado.", stream=True)
     
     time.sleep(random.uniform(2,5))
+    print("Hashtags selecionadas:", hashtags)
 
-    json_data = fetch_posts(target_hashtag_for_liking=hashtags, amount=6)
+    monitor_result = monitoring_agent.run(f"Use a lista de hashtags: {hashtags}. Use a ferramenta fetch_posts(target_hashtag_for_liking={hashtags}, amount=6) para buscar posts recentes e recuperar os comentários desses posts. Retorne EXATAMENTE o JSON que a ferramenta retornar.")
+    json_data = load_json_from_response(monitor_result.content)
+    print("Dados JSON dos posts recuperados:", json_data)
 
     ids_recuperados = [post["id"] for post in json_data]
     print("IDs recuperados:", ids_recuperados)
@@ -259,10 +262,17 @@ def run_instagram_pipeline(hashtags_input: list[str] | str = None):
     print("Contexto do post:", post_context)
 
     context_json = load_json_from_response(post_context)
-    json_save_data(context_json)
-    print("Contexto JSON carregado:", context_json)
+    print(f"Tipo de context_json: {type(context_json)}")
+    print(f"Contexto JSON carregado: {context_json}")
 
-    list_id = [item['user_id'] for item in context_json]  # Mais pythônico ✅
+    # ✅ Filtrar apenas itens válidos com user_id
+    list_id = [str(item['user_id']) for item in context_json if isinstance(item, dict) and 'user_id' in item]
+
+    if not list_id:
+        print("[AVISO] Nenhum user_id válido encontrado")
+        return {"status": "sucesso", "message": "Nenhum usuário para contatar", "users_contacted": 0}
+
+    print(f"User IDs extraídos: {list_id}")
 
     resultt = receive_direct_message(user_ids=list_id)
     print("Resultado final do agente de recebimento de mensagens diretas:", resultt)
