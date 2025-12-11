@@ -8,3 +8,4 @@ dotenv
 instagrapi
 openai
 uvicorn
+resend

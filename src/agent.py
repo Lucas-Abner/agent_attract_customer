@@ -84,15 +84,9 @@ monitoring_agent = Agent(
         "NÃO adicione texto explicativo. APENAS o JSON da ferramenta."
     ),
     expected_output=("Lista de posts com comentários em formato JSON:"
-                     "```json\n"
-                        "[\n"
-                        "  {\n"
-                        "    \"id\": \"123456789\",\n"
-                        "    \"pk\": \"PK do post.\",\n"
-                        "  }\n"
-                        "]\n"
-                        "```"),
-    tool_call_limit=2
+                     "```json\n[{\"id\": \"...\", \"pk\": \"...\", \"hashtag\": \"...\"}]\n```"),
+    tool_call_limit=1,
+    parse_response=True
 )
 
 def get_comments(ids_recuperados):

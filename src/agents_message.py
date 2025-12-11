@@ -29,7 +29,24 @@ analitic_agent = Agent(
     markdown=True,
     tool_call_limit=1,
     instructions=("Pegue o resultado obtido pelo agente anterior e verifique o sentimento das mensagens enviadas."
-                "O resultado será passado para você."),
+                "O resultado será passado para você."
+                "A primeira coisa a ser analisada é se na mensagem existe um contato"
+                "Ex: telefone, email, whatsapp, instagram, facebook, linkedin."
+                "Se encontrar um contato, RETORNE SOMENTE esse contato e o user_id em um json com os campos:"
+                "```json\n"
+                "  {\n"
+                "    \"user_id\": \"12345678\",\n"
+                "    \"contato\": \"contato@exemplo.com\"\n"
+                "  }\n"
+                "```"
+                "Se não encontrar um contato, analise o sentimento da mensagem e retorne em um json com os campos:"
+                "```json\n"
+                "  {\n"
+                "    \"user_id\": \"12345678\",\n"
+                "    \"analise_sentimento\": \"Negativo, Positivo, Neutro\",\n"
+                "    \"ultima_mensagem\": \"Ultima mensagem enviada pelo usuario e analisada\",\n"
+                "  }\n"
+                "```"),
     expected_output=("Analise o sentimento e envie uma nova mensagem e retorne em json com os campos:"
                     "```json\n"
                         "[\n"

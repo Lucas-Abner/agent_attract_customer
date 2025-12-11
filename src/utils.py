@@ -19,6 +19,8 @@ def autenticar_instagram():
     """
     SESSION_FILE_PATH = "session_instagram.json"
     cl = Client()
+    cl.delay_range = [2, 5]  # Simula comportamento humano
+    old_session = None
     
     if os.path.exists(SESSION_FILE_PATH):
         try:
@@ -31,10 +33,14 @@ def autenticar_instagram():
             print(f"Erro ao validar sessão: {e}")
             print("Sessão expirada, fazendo novo login...")
             # Remove sessão antiga
+            old_session = cl.get_settings()
             os.remove(SESSION_FILE_PATH)
     
     # Se não tem sessão ou expirou, faz novo login
     try:
+        cl.set_settings({})
+        cl.set_uuids(old_session.get("uuids"))
+
         cl.login(os.getenv("LOGIN_USERNAME"), os.getenv("LOGIN_PASSWORD"))
         cl.dump_settings(SESSION_FILE_PATH)
         print("Nova sessão criada e salva")
@@ -45,35 +51,85 @@ def autenticar_instagram():
 def load_json_from_response(response_text: str):
     """
     Extrai JSON de uma resposta que pode conter markdown ou texto adicional.
+    Versão mais robusta com múltiplas estratégias.
     """
+    if not response_text or not isinstance(response_text, str):
+        raise ValueError("Response vazio ou inválido")
+    
+    # 1️⃣ Tenta parse direto
     try:
-        return json.loads(response_text)
+        return json.loads(response_text.strip())
     except json.JSONDecodeError:
         pass
     
-    # Tenta extrair JSON de blocos de código markdown
-    json_pattern = r'```(?:json)?\s*(\[[\s\S]*?\]|\{[\s\S]*?\})\s*```'
-    matches = re.findall(json_pattern, response_text, re.DOTALL)
+    # 2️⃣ Extrai de blocos markdown (```json ... ```)
+    markdown_patterns = [
+        r'```json\s*(\[[\s\S]*?\]|\{[\s\S]*?\})\s*```',
+        r'```\s*(\[[\s\S]*?\]|\{[\s\S]*?\})\s*```'
+    ]
     
-    if matches:
+    for pattern in markdown_patterns:
+        matches = re.findall(pattern, response_text, re.DOTALL)
+        for match in matches:
+            try:
+                parsed = json.loads(match.strip())
+                print(f"✅ JSON extraído de markdown: {len(str(parsed))} chars")
+                return parsed
+            except json.JSONDecodeError:
+                continue
+    
+    # 3️⃣ Procura arrays ou objetos JSON no texto
+    # Busca o MAIOR bloco JSON válido
+    json_patterns = [
+        r'\[[\s\S]*\]',  # Arrays
+        r'\{[\s\S]*\}'   # Objects
+    ]
+    
+    candidates = []
+    for pattern in json_patterns:
+        matches = re.findall(pattern, response_text, re.DOTALL)
+        for match in matches:
+            try:
+                parsed = json.loads(match.strip())
+                candidates.append((len(str(match)), parsed))
+            except json.JSONDecodeError:
+                continue
+    
+    if candidates:
+        # Retorna o maior JSON encontrado
+        candidates.sort(reverse=True, key=lambda x: x[0])
+        parsed = candidates[0][1]
+        print(f"✅ JSON extraído do texto: {candidates[0][0]} chars")
+        return parsed
+    
+    # 4️⃣ Tenta limpar o texto e extrair JSON
+    # Remove linhas que não são JSON
+    lines = response_text.split('\n')
+    json_lines = []
+    in_json = False
+    
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith('[') or stripped.startswith('{'):
+            in_json = True
+        if in_json:
+            json_lines.append(line)
+        if stripped.endswith(']') or stripped.endswith('}'):
+            break
+    
+    if json_lines:
         try:
-            return json.loads(matches[0])
-        except json.JSONDecodeError as e:
-            print(f"[ERRO] JSON em markdown inválido: {e}")
-            print(f"Conteúdo: {matches[0][:200]}...")
+            cleaned = '\n'.join(json_lines)
+            parsed = json.loads(cleaned)
+            print(f"✅ JSON extraído por limpeza: {len(cleaned)} chars")
+            return parsed
+        except json.JSONDecodeError:
+            pass
     
-    # Tenta encontrar array ou objeto JSON diretamente no texto
-    json_pattern_direct = r'(\[[\s\S]*?\]|\{[\s\S]*?\})'
-    matches_direct = re.findall(json_pattern_direct, response_text, re.DOTALL)
-    
-    if matches_direct:
-        try:
-            return json.loads(matches_direct[0])
-        except json.JSONDecodeError as e:
-            print(f"[ERRO] JSON direto inválido: {e}")
-            print(f"Conteúdo: {matches_direct[0][:200]}...")
-    
-    raise ValueError(f"Não foi possível extrair JSON válido da resposta. Resposta recebida:\n{response_text[:500]}...")
+    # 5️⃣ Fallback: retorna lista vazia com warning
+    print(f"⚠️ AVISO: Nenhum JSON encontrado, retornando lista vazia")
+    print(f"Response (primeiros 500 chars):\n{response_text[:500]}")
+    return []  # ✅ Retorna lista vazia ao invés de erro
 
 def json_save_data(data, filename="infos_comments.json"):
 

@@ -152,6 +152,15 @@ class InstagramMonitor:
                                         "reason": "sentimento negativo"
                                     }
                                     continue
+                                if entry["contato"]:
+                                    delete_json_key(uid)
+                                    self.results["uid"] = {
+                                        "thread_id": thread.id,
+                                        "action": "encerrado",
+                                        "reason": "contato encontrado",
+                                        "contato": entry["contato"]
+                                    }
+                                    continue
 
                         except Exception as e:
                             self.results[uid] = {

@@ -132,13 +132,6 @@ def fetch_posts(target_hashtag_for_liking: list[str] | str, amount: int):
                 except ValidationError as ve:
                     # pydantic ValidationError -> pular e logar
                     print(f"[ValidationError] Pulando media.pk={getattr(media, 'pk', 'unknown')}: {ve}")
-                    # # opcional: salvar/inspecionar o raw response para debugar
-                    # try:
-                    #     raw = getattr(media, "json", None) or getattr(media, "raw", None)
-                    #     print("Raw media (parte):", str(raw)[:1000])
-                    # except Exception:
-                    #     pass
-                    # continue
                 except Exception as e:
                     # captura outros erros (rede, parsing, etc.) mas não interrompe tudo
                     print(f"[Erro] ao processar media.pk={getattr(media, 'pk', 'unknown')}: {e}")
@@ -200,6 +193,7 @@ def send_direct_message(id, message_to_direct: str):
     """
 
     cl = autenticar_instagram()
+    cl.delay_range = [2, 5]
     try:
         cl.direct_send(message_to_direct, user_ids=[id])
         return f"Mensagem enviada para o usuário com ID {id}"
