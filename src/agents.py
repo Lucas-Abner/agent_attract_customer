@@ -48,6 +48,8 @@ def receive_direct_message(user_ids: list[str] | None = None):
             try:
                 response_message: RunOutput = initial_agent.run(f"Inicie conversa com {uid} enviando: 'Olá! Notei seu interesse...'")
                 results[uid] = {"thread_id": None, "action": "iniciado", "response": response_message.content}
+                # Delay entre envios de DMs para evitar bloqueio
+                time.sleep(random.uniform(10, 40))
             except Exception as e:
                 results[uid] = {"thread_id": None, "action": "erro_iniciar", "error": str(e)}
 
@@ -56,7 +58,7 @@ def receive_direct_message(user_ids: list[str] | None = None):
 
 
 loaded_agent = Agent(
-    model=Ollama("llama3.1:8b"),
+    model=Ollama("gpt-oss:20b"),
     description="Agente para conectar-se ao Instagram usando uma ferramenta dedicada.",
     markdown=True,
     tools=[load_instagram_session],
@@ -65,12 +67,12 @@ loaded_agent = Agent(
 )
 
 monitoring_agent = Agent(
-    model=OpenAIChat(
-         api_key=os.environ.get("GROQ_API_KEY"),
-         base_url="https://api.groq.com/openai/v1",
-         id="openai/gpt-oss-20b"
-    ),
-    # model=Ollama("llama3.1:8b"),
+    # model=OpenAIChat(
+    #      api_key=os.environ.get("GROQ_API_KEY"),
+    #      base_url="https://api.groq.com/openai/v1",
+    #      id="openai/gpt-oss-20b"
+    # ),
+    model=Ollama("qwen2.5:7b"),
     markdown=True,
     tools=[fetch_posts],
     description="Agente para buscar posts recentes com uma hashtag específica e recuperar os comentários desses posts e Usuários.",
@@ -81,7 +83,7 @@ monitoring_agent = Agent(
         "Passe a lista completa de hashtags: fetch_posts(target_hashtag_for_liking={hashtags}, amount=6)"
         "Retorne EXATAMENTE o JSON que a ferramenta retornar, no formato:"
         "```json\n[{\"id\": \"...\", \"pk\": \"...\", \"hashtag\": \"...\"}]\n```"
-        "NÃO adicione texto explicativo. APENAS o JSON da ferramenta."
+        "NÃO adicione texto explicativo. APENAS o JSON."
     ),
     expected_output=("Lista de posts com comentários em formato JSON:"
                      "```json\n[{\"id\": \"...\", \"pk\": \"...\", \"hashtag\": \"...\"}]\n```"),
@@ -95,16 +97,17 @@ def get_comments(ids_recuperados):
     for post in ids_recuperados:
         comment = fetch_comments_for_post(media_id=post, amount=5)
         comments.append({post: comment})
+        time.sleep(random.uniform(6, 20))  # Atraso aleatório aumentado para evitar bloqueios
     return comments
 
 
 sentiment_agent = Agent(
-    model=OpenAIChat(
-        api_key=os.environ.get("GROQ_API_KEY"),
-        base_url="https://api.groq.com/openai/v1",
-        id="openai/gpt-oss-20b"
-    ),
-    # model=Ollama("llama3.1:8b"),
+    # model=OpenAIChat(
+    #     api_key=os.environ.get("GROQ_API_KEY"),
+    #     base_url="https://api.groq.com/openai/v1",
+    #     id="openai/gpt-oss-20b"
+    # ),
+    model=Ollama("gpt-oss:20b"),
     markdown=True,
     description="Agente de análise de sentimentos dos comentários.",
     instructions=("""
@@ -154,7 +157,7 @@ sentiment_agent = Agent(
 )
 
 send_agent = Agent(
-    model=Ollama("qwen2.5:7b"),
+    model=Ollama("gpt-oss:20b"),
     tools=[return_infos_thread],
     instructions=(
         "Pegue os user_ids dos usuários que fizeram comentários positivos."
@@ -237,8 +240,7 @@ def run_instagram_pipeline(hashtags_input: list[str] | str = None):
     print(f"Hashtags selecionadas para monitoramento: {hashtags}")
 
     login_response = loaded_agent.print_response(f"Use a ferramenta load_instagram_session para fazer login no Instagram com o nome de usuário {USERNAME} e a senha {PASSWORD}, e retorne o resultado.", stream=True)
-    
-    time.sleep(random.uniform(2,5))
+
     print("Hashtags selecionadas:", hashtags)
 
     monitor_result = monitoring_agent.run(f"Use a lista de hashtags: {hashtags}. Use a ferramenta fetch_posts(target_hashtag_for_liking={hashtags}, amount=6) para buscar posts recentes e recuperar os comentários desses posts. Retorne EXATAMENTE o JSON que a ferramenta retornar.")

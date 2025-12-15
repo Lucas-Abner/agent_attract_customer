@@ -19,7 +19,7 @@ def autenticar_instagram():
     """
     SESSION_FILE_PATH = "session_instagram.json"
     cl = Client()
-    cl.delay_range = [2, 5]  # Simula comportamento humano
+    cl.delay_range = [6, 12]  # Simula comportamento humano com delays maiores
     old_session = None
     
     if os.path.exists(SESSION_FILE_PATH):
@@ -242,6 +242,7 @@ def fetch_comments_for_post(media_id: str, amount: int):
     """
 
     cl = autenticar_instagram()
+    cl.delay_range = [5, 10]  # Simula comportamento humano com delays maiores
 
     try:
         comments = cl.media_comments(media_id, amount=amount)

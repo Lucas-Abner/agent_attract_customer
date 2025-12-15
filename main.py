@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from src.monitor_msg import InstagramMonitor
-from src.agent import run_instagram_pipeline
+from src.agents import run_instagram_pipeline
 import json
 import os
 

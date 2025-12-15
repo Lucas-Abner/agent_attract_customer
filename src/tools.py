@@ -7,8 +7,8 @@ import random
 from agno.tools import tool
 from pydantic import ValidationError
 
-USERNAME = os.getenv("LOGIN_USERNAME", "llucasabner")
-PASSWORD = os.getenv("LOGIN_PASSWORD", "lucascaixeta1")
+USERNAME = os.getenv("LOGIN_USERNAME")
+PASSWORD = os.getenv("LOGIN_PASSWORD")
 
 @tool(
         name="load_instagram_session",
@@ -22,7 +22,7 @@ def load_instagram_session(USERNAME: str, PASSWORD: str) -> str:
     SESSION_FILE_PATH = "session_instagram.json"
 
     cl = Client()
-
+    cl.delay_range = [6, 12]
     if os.path.exists(SESSION_FILE_PATH):
         cl.load_settings(SESSION_FILE_PATH)
         print(f"Loaded session from {SESSION_FILE_PATH}")
@@ -56,11 +56,12 @@ def load_instagram_session(USERNAME: str, PASSWORD: str) -> str:
             print(f"Sessão salva em {SESSION_FILE_PATH}")
         except Exception as e:
             print(f"Erro ao fazer login: {e}")
-    time.sleep(random.uniform(2, 5))
+    time.sleep(random.uniform(6, 20))
     if cl.user_id:
         return f"Login bem-sucedido como {cl.username} (ID: {cl.user_id})"
     else:
         return "Autenticação no login falhou. Verifique suas credenciais."
+
 
 
 @tool(        
@@ -69,18 +70,16 @@ def load_instagram_session(USERNAME: str, PASSWORD: str) -> str:
 )
 def fetch_posts(target_hashtag_for_liking: list[str] | str, amount: int):
     """
-    Loga no instagram.
-    Busca posts recentes com uma hashtag específica e recupera os comentários.
-    
+    Busca posts recentes com uma hashtag específica.
     Args:
-        target_hashtag_for_liking: Nome da hashtag sem o símbolo # (exemplo: ['pythonprogramming', 'coding'])
-        amount: Quantidade de posts para buscar (exemplo: 3)
-    
+        target_hashtag_for_liking: Lista de hashtags ou string única para buscar posts.
+        amount: Número de posts a buscar por hashtag.
     Returns:
-        dict: Dicionário com total_posts e lista de posts com comentários
+        Lista de dicionários contendo 'pk', 'id' e 'hashtag' de cada post.
     """
-
     import ast
+    
+    # Parse das hashtags
     if isinstance(target_hashtag_for_liking, str):
         try:
             parsed = ast.literal_eval(target_hashtag_for_liking)
@@ -89,11 +88,10 @@ def fetch_posts(target_hashtag_for_liking: list[str] | str, amount: int):
             else:
                 hashtags = [target_hashtag_for_liking]
         except (ValueError, SyntaxError):
-            hashtags = [target_hashtag_for_liking] if target_hashtag_for_liking else []  # ✅ FIX
+            hashtags = [target_hashtag_for_liking] if target_hashtag_for_liking else []
     else:
         hashtags = target_hashtag_for_liking if target_hashtag_for_liking else []
 
-    # ✅ Adicione validação extra para remover strings vazias
     hashtags = [h.strip() for h in hashtags if h and h.strip()]
 
     if not hashtags:
@@ -109,39 +107,77 @@ def fetch_posts(target_hashtag_for_liking: list[str] | str, amount: int):
 
     cl = autenticar_instagram()
     results = []
+    
+    total_posts_processados = 0
+    total_posts_com_erro = 0
 
     for hashtag in hashtags:
-        print(f"Processando hashtag individual: {hashtag}")
-        hashtag_search = hashtag.lstrip('#')  # Remove '#' se estiver presente
+        print(f"\n📍 Processando hashtag: #{hashtag}")
+        hashtag_search = hashtag.lstrip('#')
+        
         try:
-            print(f"Posts com a hashtag #{hashtag_search}")
+            print(f"Buscando posts recentes para #{hashtag_search}...")
             recent_hash_media = cl.hashtag_medias_recent(hashtag_search, amount=amount)
-            print(f"Posts encontrados: {len(recent_hash_media)}")
-            time.sleep(random.uniform(1,3))
+            print(f"✅ {len(recent_hash_media)} posts encontrados")
+            time.sleep(random.uniform(3, 8))
 
-            for media in recent_hash_media:
+            for idx, media in enumerate(recent_hash_media, 1):
                 try:
+                    # ✅ Tenta extrair apenas os dados essenciais
                     media_id = cl.media_id(media.pk)
-                    print(f"ID do post: {media_id}")
-                    # Aqui é onde a validação pode falhar (media_info usa modelos pydantic)
+                    
+                    # ✅ Valida se os dados essenciais existem
+                    if not media.pk or not media_id:
+                        print(f"⚠️ Post {idx}: Dados incompletos (pk ou id ausente), pulando...")
+                        total_posts_com_erro += 1
+                        continue
+                    
+                    print(f"✅ Post {idx}: ID={media_id}, PK={media.pk}")
+                    
                     results.append({
-                        "pk": media.pk,
-                        "id": media_id,
+                        "pk": str(media.pk),
+                        "id": str(media_id),
                         "hashtag": hashtag_search
                     })
+                    
+                    total_posts_processados += 1
+                    cl.delay_range = [3, 8]
+                    
                 except ValidationError as ve:
-                    # pydantic ValidationError -> pular e logar
-                    print(f"[ValidationError] Pulando media.pk={getattr(media, 'pk', 'unknown')}: {ve}")
-                except Exception as e:
-                    # captura outros erros (rede, parsing, etc.) mas não interrompe tudo
-                    print(f"[Erro] ao processar media.pk={getattr(media, 'pk', 'unknown')}: {e}")
+                    # ✅ Captura erros de validação do Pydantic
+                    total_posts_com_erro += 1
+                    print(f"⚠️ Post {idx}: ValidationError (dados incompletos)")
+                    print(f"   Detalhes: {ve.error_count()} erro(s) - {ve.errors()[0]['type']}")
                     continue
-            time.sleep(random.uniform(2,5))
+                    
+                except AttributeError as ae:
+                    # ✅ Captura quando media não tem os atributos esperados
+                    total_posts_com_erro += 1
+                    print(f"⚠️ Post {idx}: Atributo ausente - {ae}")
+                    continue
+                    
+                except Exception as e:
+                    # ✅ Captura outros erros inesperados
+                    total_posts_com_erro += 1
+                    print(f"❌ Post {idx}: Erro inesperado - {type(e).__name__}: {e}")
+                    continue
+            
+            time.sleep(random.uniform(6, 20))
+            print(f"✅ Hashtag #{hashtag_search} processada: {len([r for r in results if r['hashtag'] == hashtag_search])} posts válidos")
 
         except Exception as e_hashtag:
-            print(f"Erro ao buscar posts para a hashtag #{target_hashtag_for_liking}: {e_hashtag}")
-            print("[INFO] Pulando para a próxima hashtag...")
+            print(f"❌ Erro ao buscar posts para #{hashtag_search}: {e_hashtag}")
+            print("   Continuando para próxima hashtag...")
             continue
+    
+    # ✅ Relatório final
+    print(f"\n{'='*50}")
+    print(f"📊 RESUMO DA BUSCA")
+    print(f"{'='*50}")
+    print(f"✅ Posts processados com sucesso: {total_posts_processados}")
+    print(f"⚠️ Posts com erros (pulados): {total_posts_com_erro}")
+    print(f"📋 Total de posts válidos retornados: {len(results)}")
+    print(f"{'='*50}\n")
             
     return results
 
@@ -193,7 +229,7 @@ def send_direct_message(id, message_to_direct: str):
     """
 
     cl = autenticar_instagram()
-    cl.delay_range = [2, 5]
+    cl.delay_range = [10, 40]  # Delay maior para envio de DMs
     try:
         cl.direct_send(message_to_direct, user_ids=[id])
         return f"Mensagem enviada para o usuário com ID {id}"

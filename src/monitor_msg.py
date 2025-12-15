@@ -4,6 +4,7 @@ import time
 import json
 import datetime
 import os
+import random
 from agno.agent import RunOutput
 from .utils import autenticar_instagram, load_json_from_response, delete_json_key
 from .agents_message import analitic_agent, message_agent
@@ -193,4 +194,4 @@ class InstagramMonitor:
                 print(f"Erro geral: {e}")
                 self.results["error"] = str(e)
 
-            time.sleep(10) 
+            time.sleep(random.uniform(6, 20))  # Delay aumentado para evitar bloqueios 
