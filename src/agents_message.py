@@ -1,6 +1,7 @@
 from agno.agent import Agent, RunOutput
 from agno.models.openai import OpenAIChat
-from .tools import send_direct_message
+from agno.models.ollama import Ollama
+from .tools import send_direct_message, send_email
 from dotenv import load_dotenv
 import os
 
@@ -19,11 +20,12 @@ Não mencione que você é um agente ou que está utilizando ferramentas automat
 '''
 
 analitic_agent = Agent(
-    model=OpenAIChat(
-        api_key=os.environ.get("GROQ_API_KEY"),
-        base_url="https://api.groq.com/openai/v1",
-        id="openai/gpt-oss-20b"
-    ),
+    # model=OpenAIChat(
+    #     api_key=os.environ.get("GROQ_API_KEY"),
+    #     base_url="https://api.groq.com/openai/v1",
+    #     id="openai/gpt-oss-20b"
+    # ),
+    model=Ollama("gpt-oss:20b"),
     name="json_sentiment_data",
     description="Agente para analisar o sentimento das mensagens enviadas no Instagram.",
     markdown=True,
@@ -61,11 +63,12 @@ analitic_agent = Agent(
 
 
 message_agent = Agent(
-    model=OpenAIChat(
-        api_key=os.environ.get("GROQ_API_KEY"),
-        base_url="https://api.groq.com/openai/v1",
-        id="openai/gpt-oss-20b"
-    ),
+    # model=OpenAIChat(
+    #     api_key=os.environ.get("GROQ_API_KEY"),
+    #     base_url="https://api.groq.com/openai/v1",
+    #     id="openai/gpt-oss-20b"
+    # ),
+    model=Ollama("llama3.1:8b"),
     system_message=SYSTEM_PROMPT,
     description="Agente para enviar mensagens diretas no Instagram.",
     tools=[send_direct_message],
@@ -76,5 +79,22 @@ message_agent = Agent(
                 'Receba o histórico de mensagens e envie uma resposta apropriada com base no contexto da conversa.'
     ),
     expected_output="Envie uma mensagem direta personalizada para o usuário com base na análise de sentimento.",
+    tool_call_limit=1,
+)
+
+email_agent = Agent(
+    model = OpenAIChat(
+        api_key=os.environ.get("GROQ_API_KEY"),
+        base_url="https://api.groq.com/openai/v1",
+        id="openai/gpt-oss-20b"
+    ),
+    description="Agente para enviar emails de leads capturados.",
+    tools=[send_email],
+    instructions=('Pegue o json do agente anterior e envie um email para o usuário.'
+                  'Use a ferramenta send_email para enviar um email.'
+                  'Passe os parâmetros corretos: message como string.'
+                  'Envie uma mensagem de email repassando o contato extraído.'
+    ),
+    expected_output="Envie um email personalizado para o usuário com base na análise de sentimento.",
     tool_call_limit=1
 )

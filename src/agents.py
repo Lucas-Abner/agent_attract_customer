@@ -46,7 +46,7 @@ def receive_direct_message(user_ids: list[str] | None = None):
     for uid in user_ids:
         if uid not in results:
             try:
-                response_message: RunOutput = initial_agent.run(f"Inicie conversa com {uid} enviando: 'Olá! Notei seu interesse...'")
+                response_message: RunOutput = initial_agent.run(f"Inicie conversa com 56295393358 enviando uma mensagem de apresentação profissional e amigável sobre a empresa InteriArt e seus serviços.")
                 results[uid] = {"thread_id": None, "action": "iniciado", "response": response_message.content}
                 # Delay entre envios de DMs para evitar bloqueio
                 time.sleep(random.uniform(10, 40))
@@ -179,11 +179,12 @@ send_agent = Agent(
 )
 
 initial_agent = Agent(
-    model=OpenAIChat(
-        api_key=os.environ.get("GROQ_API_KEY"),
-        base_url="https://api.groq.com/openai/v1",
-        id="openai/gpt-oss-20b"
-    ),
+    # model=OpenAIChat(
+    #     api_key=os.environ.get("GROQ_API_KEY"),
+    #     base_url="https://api.groq.com/openai/v1",
+    #     id="openai/gpt-oss-20b"
+    # ),
+    model = Ollama("gpt-oss:20b"),
     name="message_instagram_user",
     description="Agente especializado em iniciar conversas qualificadas com leads no Instagram através de mensagens personalizadas.",
     markdown=True,

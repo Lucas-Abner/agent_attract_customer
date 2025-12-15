@@ -6,6 +6,10 @@ import time
 import random
 from agno.tools import tool
 from pydantic import ValidationError
+import resend
+from dotenv import load_dotenv
+
+load_dotenv()
 
 USERNAME = os.getenv("LOGIN_USERNAME")
 PASSWORD = os.getenv("LOGIN_PASSWORD")
@@ -235,3 +239,30 @@ def send_direct_message(id, message_to_direct: str):
         return f"Mensagem enviada para o usuário com ID {id}"
     except Exception as e_direct:
         print(f"Erro ao enviar mensagem direta: {e_direct}")
+
+
+@tool(
+    name="send_email",
+    description="Ferramenta para enviar um email usando a API Resend.",
+)
+def send_email(message):
+    """
+    Envia um email usando a API Resend.
+    Args:
+        message: Conteúdo do email a ser enviado.
+    Returns:
+        Confirmação do envio do email.
+    """
+
+
+    resend.api_key = os.getenv("RESEND_API_KEY")
+
+    params: resend.Emails.SendParams = {
+    "from": "Acme <onboarding@resend.dev>",
+    "to": ["lucascaixeta02@gmail.com"],
+    "subject": "Contato de Lead Capturado",
+    "html": f"<p>{message}</p>"
+    }
+
+    email = resend.Emails.send(params)
+    return email
